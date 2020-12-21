@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/alpacahq/alpaca-trade-api-go/alpaca"
 	"github.com/shopspring/decimal"
+	"time"
 )
 
 type stock struct {
@@ -16,20 +17,45 @@ func init() {
 }
 
 func main() {
-	assetList := getAssets()
+	// TODO: Scrape these assets from websites instead
+	//assetList := getAssets()
+	assetList := []string{
+		"NIO", "AAPL", "AAL", "BAC", "GE", "PLTR", "FEYE", "F", "TSLA", "CCL", "INTC", "AMD", "WFC", "ITUB", "LAZR",
+		"T", "FCEL", "PLUG", "PFE", "FUBO", "C", "MSFT", "OXY", "NOK", "BBD", "JPM", "XOM", "NCLH", "MRNA", "VALE",
+		"UBER", "SWN", "QS", "UAL", "LI", "ET", "M", "ABEV", "BP", "MRO", "XPEV", "BA", "HBAN", "BB", "KGC", "KMI",
+		"BFT", "AJRD", "SPCE", "RYCEY", "SWI", "DAL", "ABNB", "PBR", "GOLD", "SAN", "JMIA", "LKNCY", "SIRI", "CSCO",
+		"IQ", "RP", "FB", "NKE", "BIDU", "ZNGA", "SDC", "COTY", "MGNI", "ORCL", "LYG", "VZ", "GM", "MS", "AZN", "WKHS",
+		"AI", "DKNG", "X", "MU", "AUY", "PTON", "GLIBA", "EDIT", "ATUS", "PINS", "HL", "APHA", "VER", "LUMN", "KO",
+		"SRNE", "FCX", "CVX", "DIS", "BABA", "SQ", "ZM", "CMCSA", "COP", "COP", "NLY", "ZM", "VTRS", "SPWR", "WORK",
+		"WISH", "CLF", "TWTR", "SU", "GILD", "HPE", "VLDR", "NKLA", "KEY", "MO", "HPQ", "CRM", "JBLU", "DVN", "RDS-A",
+		"SABR", "MRK", "HAL", "RF", "SNAP", "HST", "MGM", "SAVE", "CRWD", "BMY", "PACB", "AG", "BSX", "BILI", "EPD",
+		"CHWY", "GS", "FSR", "MRVL", "LYFT", "APA", "WMT", "WMB", "KR", "VOD"}
 	clock, _ := alpaca.GetClock()
-	account, err := alpaca.GetAccount()
-	if err != nil {
-		panic(err)
-	}
-	buyingPower := account.BuyingPower
+
+	var account *alpaca.Account
+	var err error
+
+	updateTime := time.Now()
+	firstTime := true
 
 	for true {
 		if clock.IsOpen {
-			buyList, sellList := movingAvgComparison(assetList)
+			if time.Now().Sub(updateTime) > time.Duration(60e9) || firstTime { // Scan once a minute
+				firstTime = false
+				account, err = alpaca.GetAccount()
+				if err != nil {
+					panic(err)
+				}
+				updateTime = time.Now()
+				fmt.Println("Updated account info")
+				fmt.Printf("Equity: %v \n", account.Equity)
+				fmt.Printf("Buying power: %v \n", account.BuyingPower)
+				buyList, sellList := movingAvgComparison(assetList)
 
-			manageStockPurchases(buyList, buyingPower)
-			manageStockSales(sellList)
+				manageStockPurchases(buyList, account.BuyingPower)
+				manageStockSales(sellList)
+				fmt.Println()
+			}
 		}
 	}
 }
@@ -39,7 +65,7 @@ func manageStockPurchases(buyList []stock, buyingPower decimal.Decimal) {
 		moneyPerSymbol := buyingPower.Div(decimal.NewFromInt(int64(len(buyList))))
 
 		for _, asset := range buyList {
-			numShares := moneyPerSymbol.Div(decimal.NewFromFloat(asset.price).RoundDown(0))
+			numShares := moneyPerSymbol.Div(decimal.NewFromFloat(asset.price)).RoundDown(0)
 			if numShares.GreaterThan(decimal.NewFromInt(0)) {
 				fmt.Printf("Buying %v shares of %v at %v each. \n", numShares, asset.symbol, asset.price)
 				alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
