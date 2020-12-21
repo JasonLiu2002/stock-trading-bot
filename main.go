@@ -6,6 +6,11 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type stock struct {
+	symbol string
+	price  float64
+}
+
 func init() {
 	alpaca.SetBaseUrl("https://paper-api.alpaca.markets")
 }
@@ -21,28 +26,36 @@ func main() {
 
 	for true {
 		if clock.IsOpen {
-
 			buyList, sellList := movingAvgComparison(assetList)
 
-			if buyingPower.GreaterThan(decimal.NewFromInt(0)) {
-				moneyPerSymbol := buyingPower.Div(decimal.NewFromInt(int64(len(buyList))))
+			manageStockPurchases(buyList, buyingPower)
+			manageStockSales(sellList)
+		}
+	}
+}
 
-				for _, asset := range buyList {
-					numShares := moneyPerSymbol.Div(decimal.NewFromFloat(asset.price).RoundDown(0))
-					fmt.Printf("Buying %v shares of %v at %v each. \n", numShares, asset.symbol, asset.price)
-					buy(asset.symbol, numShares)
-				}
+func manageStockPurchases(buyList []stock, buyingPower decimal.Decimal) {
+	if buyingPower.GreaterThan(decimal.NewFromInt(0)) {
+		moneyPerSymbol := buyingPower.Div(decimal.NewFromInt(int64(len(buyList))))
 
-				for _, asset := range sellList {
-					position, err := alpaca.GetPosition(asset.symbol)
-					if err != nil {
-						panic(err)
-					}
-					fmt.Printf("Selling %v shares of %v at %v each. \n", position.Qty, asset.symbol, asset.price)
-					sell(asset.symbol, position.Qty)
-				}
+		for _, asset := range buyList {
+			numShares := moneyPerSymbol.Div(decimal.NewFromFloat(asset.price).RoundDown(0))
+			if numShares.GreaterThan(decimal.NewFromInt(0)) {
+				fmt.Printf("Buying %v shares of %v at %v each. \n", numShares, asset.symbol, asset.price)
+				buy(asset.symbol, numShares)
 			}
 		}
+	}
+}
+
+func manageStockSales(sellList []stock) {
+	for _, asset := range sellList {
+		position, err := alpaca.GetPosition(asset.symbol)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Selling %v shares of %v at %v each. \n", position.Qty, asset.symbol, asset.price)
+		sell(asset.symbol, position.Qty)
 	}
 }
 
@@ -81,9 +94,4 @@ func buy(symbol string, numShares decimal.Decimal) {
 		Type:        alpaca.Market,
 		TimeInForce: alpaca.Day,
 	})
-}
-
-type stock struct {
-	symbol string
-	price  float64
 }
