@@ -71,19 +71,19 @@ func manageStockSales(sellList []stock) {
 	}
 }
 
-func getAssets() []alpaca.Asset {
+func getAssets() []string {
 	status := "active"
 	assets, err := alpaca.ListAssets(&status)
 	if err != nil {
 		panic(err)
 	}
 
-	tradableAssets := []alpaca.Asset{}
+	var tradeableAssets []string
 	for _, asset := range assets {
 		if asset.Tradable {
-			tradableAssets = append(tradableAssets, asset)
+			tradeableAssets = append(tradeableAssets, asset.Symbol)
 		}
 	}
 
-	return tradableAssets
+	return tradeableAssets
 }
