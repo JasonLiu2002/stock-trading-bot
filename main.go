@@ -42,7 +42,13 @@ func manageStockPurchases(buyList []stock, buyingPower decimal.Decimal) {
 			numShares := moneyPerSymbol.Div(decimal.NewFromFloat(asset.price).RoundDown(0))
 			if numShares.GreaterThan(decimal.NewFromInt(0)) {
 				fmt.Printf("Buying %v shares of %v at %v each. \n", numShares, asset.symbol, asset.price)
-				buy(asset.symbol, numShares)
+				alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
+					AssetKey:    &asset.symbol,
+					Qty:         numShares,
+					Side:        alpaca.Buy,
+					Type:        alpaca.Market,
+					TimeInForce: alpaca.Day,
+				})
 			}
 		}
 	}
@@ -55,7 +61,13 @@ func manageStockSales(sellList []stock) {
 			panic(err)
 		}
 		fmt.Printf("Selling %v shares of %v at %v each. \n", position.Qty, asset.symbol, asset.price)
-		sell(asset.symbol, position.Qty)
+		alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
+			AssetKey:    &asset.symbol,
+			Qty:         position.Qty,
+			Side:        alpaca.Sell,
+			Type:        alpaca.Market,
+			TimeInForce: alpaca.Day,
+		})
 	}
 }
 
@@ -74,24 +86,4 @@ func getAssets() []alpaca.Asset {
 	}
 
 	return tradableAssets
-}
-
-func sell(symbol string, numShares decimal.Decimal) {
-	alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
-		AssetKey:    &symbol,
-		Qty:         numShares,
-		Side:        alpaca.Sell,
-		Type:        alpaca.Market,
-		TimeInForce: alpaca.Day,
-	})
-}
-
-func buy(symbol string, numShares decimal.Decimal) {
-	alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
-		AssetKey:    &symbol,
-		Qty:         numShares,
-		Side:        alpaca.Buy,
-		Type:        alpaca.Market,
-		TimeInForce: alpaca.Day,
-	})
 }
