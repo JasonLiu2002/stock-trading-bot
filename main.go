@@ -3,38 +3,43 @@ package main
 import (
 	"fmt"
 	"github.com/alpacahq/alpaca-trade-api-go/alpaca"
-	"github.com/piquette/finance-go/quote"
 	"github.com/shopspring/decimal"
-	"strings"
 )
 
-var clock alpaca.Clock
-var account alpaca.Account
+func init() {
+	alpaca.SetBaseUrl("https://paper-api.alpaca.markets")
+}
 
 func main() {
-	alpaca.SetBaseUrl("https://paper-api.alpaca.markets")
-
-	clock, _ := alpaca.GetClock()
 	assetList := getAssets()
+	clock, _ := alpaca.GetClock()
+	account, err := alpaca.GetAccount()
+	if err != nil {
+		panic(err)
+	}
+	buyingPower := account.BuyingPower
 
 	for true {
 		if clock.IsOpen {
-			fmt.Println("Scan began...")
-			for _, asset := range assetList {
-				position, err := alpaca.GetPosition(asset.Symbol)
-				quote, _ := quote.Get(asset.Symbol)
-				if quote != nil {
+
+			buyList, sellList := movingAvgComparison(assetList)
+
+			if buyingPower.GreaterThan(decimal.NewFromInt(0)) {
+				moneyPerSymbol := buyingPower.Div(decimal.NewFromInt(int64(len(buyList))))
+
+				for _, asset := range buyList {
+					numShares := moneyPerSymbol.Div(decimal.NewFromFloat(asset.price).RoundDown(0))
+					fmt.Printf("Buying %v shares of %v at %v each. \n", numShares, asset.symbol, asset.price)
+					buy(asset.symbol, numShares)
+				}
+
+				for _, asset := range sellList {
+					position, err := alpaca.GetPosition(asset.symbol)
 					if err != nil {
-						if quote.FiftyDayAverage > 1.2*quote.TwoHundredDayAverage {
-							//buy(asset.Symbol, 5)
-							fmt.Println("Buying 5 shares of " + asset.Symbol)
-						}
-					} else {
-						if quote.FiftyDayAverage < quote.TwoHundredDayAverage {
-							//sell(asset.Symbol, position.Qty)
-							fmt.Println("Selling " + position.Qty.String() + " shares of " + asset.Symbol)
-						}
+						panic(err)
 					}
+					fmt.Printf("Selling %v shares of %v at %v each. \n", position.Qty, asset.symbol, asset.price)
+					sell(asset.symbol, position.Qty)
 				}
 			}
 		}
@@ -50,7 +55,7 @@ func getAssets() []alpaca.Asset {
 
 	tradableAssets := []alpaca.Asset{}
 	for _, asset := range assets {
-		if asset.Tradable && !strings.Contains(asset.Symbol, "-") && !strings.Contains(asset.Symbol, ".") {
+		if asset.Tradable {
 			tradableAssets = append(tradableAssets, asset)
 		}
 	}
@@ -68,12 +73,17 @@ func sell(symbol string, numShares decimal.Decimal) {
 	})
 }
 
-func buy(symbol string, numShares int64) {
+func buy(symbol string, numShares decimal.Decimal) {
 	alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
 		AssetKey:    &symbol,
-		Qty:         decimal.NewFromInt(numShares),
+		Qty:         numShares,
 		Side:        alpaca.Buy,
 		Type:        alpaca.Market,
 		TimeInForce: alpaca.Day,
 	})
+}
+
+type stock struct {
+	symbol string
+	price  float64
 }
