@@ -40,17 +40,20 @@ func main() {
 
 	for true {
 		if clock.IsOpen {
-			if time.Now().Sub(updateTime) > time.Duration(60e9) || firstTime { // Scan once a minute
+			// Scan once a minute
+			if time.Now().Sub(updateTime) > time.Duration(60e9) || firstTime {
 				firstTime = false
+				updateTime = time.Now()
 				account, err = alpaca.GetAccount()
 				if err != nil {
 					panic(err)
 				}
-				updateTime = time.Now()
 				fmt.Println("Updated account info")
 				fmt.Printf("Equity: %v \n", account.Equity)
 				fmt.Printf("Buying power: %v \n", account.BuyingPower)
-				buyList, sellList := movingAvgComparison(assetList)
+
+				buyList, sellList := volumeWeightedAveragePrice(assetList)
+				//buyList, sellList := movingAvgComparison(assetList)
 
 				manageStockPurchases(buyList, account.BuyingPower)
 				manageStockSales(sellList)
