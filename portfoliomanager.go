@@ -29,11 +29,20 @@ func main() {
 		"SRNE", "FCX", "CVX", "DIS", "BABA", "SQ", "ZM", "CMCSA", "COP", "COP", "NLY", "ZM", "VTRS", "SPWR", "WORK",
 		"WISH", "CLF", "TWTR", "SU", "GILD", "HPE", "VLDR", "NKLA", "KEY", "MO", "HPQ", "CRM", "JBLU", "DVN", "RDS-A",
 		"SABR", "MRK", "HAL", "RF", "SNAP", "HST", "MGM", "SAVE", "CRWD", "BMY", "PACB", "AG", "BSX", "BILI", "EPD",
-		"CHWY", "GS", "FSR", "MRVL", "LYFT", "APA", "WMT", "WMB", "KR", "VOD"}
+		"CHWY", "GS", "FSR", "MRVL", "LYFT", "APA", "WMT", "WMB", "KR", "VOD",
+		"BRPA", "BRPAU", "SNGX", "OCGN", "CCRC", "SOS", "NH", "JG", "CYCC", "YGMZ", "AQMS", "OLB", "AMTX", "MVIS",
+		"SGTX", "CLA.U", "VISL", "RIOT", "ELYS", "CLA", "IPV.U", "FRSX", "NK", "VERO", "WNW", "GRAY", "PTN", "STIC",
+		"UAVS", "GNPX", "KOPN", "JAGX", "QS", "CMPI", "AHT", "EYES", "QK", "AMPE", "IPV", "LPTH", "NRIX", "SPWH", "ONVO",
+		"GME", "HPK", "MFH", "HUSN", "SQFT", "VSTO", "ONTX", "VUZI", "TIGR", "IHT", "LGVW.U", "SURF", "BEAM", "ONDS",
+		"CLNE", "VLDR", "TLSA", "BLNK", "CGROU", "ADXN", "LGVW", "SOL", "EAR", "NISN", "DMTK", "HARP", "CBAT", "STPK.U", "CNSP",
+		"LPTX", "ALVR", "USIO", "SGMO", "EQOS", "NES", "OCN", "FCEL", "INDO", "BCRX", "SYRS", "RGLS", "TCS", "SPRO", "SLGG", "ITP",
+		"EH", "AQB", "LOAK.U", "NXTD", "LAC", "WBAI", "FUV", "MARA", "SEEL", "MTLS", "CCCC", "TCON",
+	}
 	clock, _ := alpaca.GetClock()
 
 	var account *alpaca.Account
 	var err error
+	var todaysDate time.Time
 
 	updateTime := time.Now()
 	firstTime := true
@@ -43,6 +52,12 @@ func main() {
 
 	for true {
 		if clock.IsOpen {
+			if firstTime {
+				fmt.Println("Markets are open!")
+				year, month, day := time.Now().Date()
+				location, _ := time.LoadLocation("GMT")
+				todaysDate = time.Date(year, month, day, 0, 0, 0, 0, location)
+			}
 			// Scan once a minute
 			if time.Now().Sub(updateTime) > time.Duration(60e9) || firstTime {
 				firstTime = false
@@ -55,10 +70,10 @@ func main() {
 				fmt.Printf("Equity: %v \n", account.Equity)
 				fmt.Printf("Buying power: %v \n", account.BuyingPower)
 
-				buyList, sellList := volumeWeightedAveragePrice(assetList)
+				buyList, sellList := volumeWeightedAveragePrice(assetList, todaysDate)
 				//buyList, sellList := movingAvgComparison(assetList)
 
-				manageStockPurchases(buyList, account.BuyingPower)
+				manageStockPurchases(buyList, account.BuyingPower.Div(decimal.NewFromInt(4)))
 				manageStockSales(sellList)
 				fmt.Println()
 			}
@@ -67,20 +82,23 @@ func main() {
 }
 
 func manageStockPurchases(buyList []stock, buyingPower decimal.Decimal) {
-	if buyingPower.GreaterThan(decimal.NewFromInt(0)) {
+	if buyingPower.GreaterThan(decimal.NewFromInt(0)) && len(buyList) > 0 {
 		moneyPerSymbol := buyingPower.Div(decimal.NewFromInt(int64(len(buyList))))
 
 		for _, asset := range buyList {
 			numShares := moneyPerSymbol.Div(decimal.NewFromFloat(asset.price)).RoundDown(0)
 			if numShares.GreaterThan(decimal.NewFromInt(0)) {
 				fmt.Printf("Buying %v shares of %v at %v each. \n", numShares, asset.symbol, asset.price)
-				alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
+				_, err := alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
 					AssetKey:    &asset.symbol,
 					Qty:         numShares,
 					Side:        alpaca.Buy,
 					Type:        alpaca.Market,
 					TimeInForce: alpaca.Day,
 				})
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
 	}
@@ -93,13 +111,16 @@ func manageStockSales(sellList []stock) {
 			panic(err)
 		}
 		fmt.Printf("Selling %v shares of %v at %v each. \n", position.Qty, asset.symbol, asset.price)
-		alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
+		_, sellErr := alpaca.PlaceOrder(alpaca.PlaceOrderRequest{
 			AssetKey:    &asset.symbol,
 			Qty:         position.Qty,
 			Side:        alpaca.Sell,
 			Type:        alpaca.Market,
 			TimeInForce: alpaca.Day,
 		})
+		if sellErr != nil {
+			panic(sellErr)
+		}
 	}
 }
 

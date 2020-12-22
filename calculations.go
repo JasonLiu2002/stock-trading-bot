@@ -2,18 +2,20 @@ package main
 
 import (
 	"github.com/alpacahq/alpaca-trade-api-go/alpaca"
+	"time"
 )
 
-func calcVwap(assetList []string) map[string]float64 {
+func calcVwap(assetList []string, date time.Time) map[string]float64 {
 	limit := 500
 	dict := make(map[string]float64)
 	for _, asset := range assetList {
 		bars, err := alpaca.GetSymbolBars(asset, alpaca.ListBarParams{
 			Timeframe: "minute",
+			StartDt:   &date,
 			Limit:     &limit,
 		})
 		if err != nil {
-			panic(err)
+			continue
 		}
 		sumPV := 0.0
 		sumVolume := 0
