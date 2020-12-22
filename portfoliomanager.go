@@ -37,6 +37,9 @@ func main() {
 
 	updateTime := time.Now()
 	firstTime := true
+	if !clock.IsOpen {
+		fmt.Println("Markets are closed, waiting...")
+	}
 
 	for true {
 		if clock.IsOpen {
