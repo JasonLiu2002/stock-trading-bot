@@ -51,33 +51,35 @@ func main() {
 	}
 
 	for true {
-		if clock.IsOpen {
-			if firstTime {
-				fmt.Println("Markets are open!")
-				year, month, day := time.Now().Date()
-				location, _ := time.LoadLocation("GMT")
-				todaysDate = time.Date(year, month, day, 0, 0, 0, 0, location)
-			}
-			// Scan once a minute
-			if time.Now().Sub(updateTime) > time.Duration(60e9) || firstTime {
+		if time.Now().Sub(updateTime) > time.Duration(60e9) || firstTime {
+			updateTime = time.Now()
+			clock, _ = alpaca.GetClock()
+			if clock.IsOpen {
+				if firstTime {
+					fmt.Println("Markets are open!")
+					year, month, day := time.Now().Date()
+					location, _ := time.LoadLocation("GMT")
+					todaysDate = time.Date(year, month, day, 0, 0, 0, 0, location)
+				}
+				// Scan once a minute
 				firstTime = false
-				updateTime = time.Now()
 				account, err = alpaca.GetAccount()
 				if err != nil {
 					panic(err)
 				}
-				fmt.Println("Updated account info")
-				fmt.Printf("Equity: %v \n", account.Equity)
-				fmt.Printf("Buying power: %v \n", account.BuyingPower)
+				//fmt.Println("Updated account info")
+				//fmt.Printf("Equity: %v \n", account.Equity)
+				fmt.Printf("Buying power: %v \n", account.DaytradingBuyingPower)
 
 				buyList, sellList := volumeWeightedAveragePrice(assetList, todaysDate)
 				//buyList, sellList := movingAvgComparison(assetList)
 
-				manageStockPurchases(buyList, account.BuyingPower.Div(decimal.NewFromInt(4)))
+				manageStockPurchases(buyList, account.DaytradingBuyingPower.Div(decimal.NewFromInt(4)))
 				manageStockSales(sellList)
-				fmt.Println()
+				//fmt.Println()
 			}
 		}
+
 	}
 }
 
