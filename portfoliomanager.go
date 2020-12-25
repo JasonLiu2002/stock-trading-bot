@@ -46,40 +46,41 @@ func main() {
 
 	updateTime := time.Now()
 	firstTime := true
+	prevClockOpenState := false
 	if !clock.IsOpen {
 		fmt.Println("Markets are closed, waiting...")
 	}
 
 	for true {
 		if time.Now().Sub(updateTime) > time.Duration(60e9) || firstTime {
+			firstTime = false
 			updateTime = time.Now()
-			clock, _ = alpaca.GetClock()
+			clock, err = alpaca.GetClock()
+			if err != nil {
+				fmt.Println(err)
+			}
 			if clock.IsOpen {
-				if firstTime {
-					fmt.Println("Markets are open!")
+				if !prevClockOpenState { // Transitions from closed to open
+					fmt.Println("Markets have opened!")
 					year, month, day := time.Now().Date()
 					location, _ := time.LoadLocation("GMT")
 					todaysDate = time.Date(year, month, day, 0, 0, 0, 0, location)
 				}
-				// Scan once a minute
-				firstTime = false
 				account, err = alpaca.GetAccount()
 				if err != nil {
 					panic(err)
 				}
-				//fmt.Println("Updated account info")
-				//fmt.Printf("Equity: %v \n", account.Equity)
 				fmt.Printf("Buying power: %v \n", account.DaytradingBuyingPower)
 
 				buyList, sellList := volumeWeightedAveragePrice(assetList, todaysDate)
 				//buyList, sellList := movingAvgComparison(assetList)
 
-				manageStockPurchases(buyList, account.DaytradingBuyingPower.Div(decimal.NewFromInt(4)))
+				// TODO: Find a better method to determine how much to purchase
+				manageStockPurchases(buyList, account.DaytradingBuyingPower.Div(decimal.NewFromInt(2)))
 				manageStockSales(sellList)
-				//fmt.Println()
 			}
+			prevClockOpenState = clock.IsOpen
 		}
-
 	}
 }
 
